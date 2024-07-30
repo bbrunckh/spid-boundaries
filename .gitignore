@@ -1,10 +1,6 @@
 ########################################################################
 #
-# Based on DIME .gitignore template. Follow the instructions in the URL
-# below to set up this template in your own repository
-# https://github.com/worldbank/dime-github-trainings/tree/main/GitHub-resources/DIME-GitHub-Templates
-#
-# This is version 2.0
+# Based on DIME .gitignore template version 2.0
 #
 ########################################################################
 
@@ -56,6 +52,9 @@
 !/**/*.Rmd
 !/**/*.Rproj
 !/**/*.qmd
+!/**/*.Rprofile
+!/**/renv/
+
 # Still ignore user file for R projects
 .Rproj.user
 
@@ -85,6 +84,7 @@
 # in dashboards, markdown notebooks, bookdown etc.
 !/**/*.css
 !/**/*.js
+!/**/*.json
 
 #Bash scripts
 !/**/*.sh
