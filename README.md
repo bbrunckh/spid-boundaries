@@ -6,19 +6,10 @@ The boundary data can be used to map the [SPID](https://pipmaps.worldbank.org/en
 
 ## Overview
 
+The proce
+
 ## Data
-
-## Description
-
-1. Prepare admin-0 data using official world bank country polygons.
-2. Prepare non-standard subnational boundary data-files
-3. Combine subnational boundaries based on SPID master list
- - prepare source boundary data
- - get unmodified boundaries
- - construct modified boundaries
- - get missing subnational boundaries
- - clip to Official WB admin-0 polygons
-4. Edge-match subnational boundaries to WB admin-0 polygons
+Subnational boundary data sources include Global Administrative Unit Layers (GAUL) 2015, Nomenclature of Territorial Units for Statistics (NUTS), GADM 4.1, United Nations Common Operational Datasets, and National Statistical Offices (NSOs).
 
 ## Instructions
 
@@ -31,7 +22,19 @@ To run the code and produce final spatial data files:
   - change line 11 to the SPID boundary master list excel file path
   - change line 14 to the vintage (e.g., "AM24")
   - run the script[^1]
+  
+## Description of code files
 
-[^1]: The R package _renv_ is used to install the same version of packages and dependencies. In case this fails, you can try to deactivate _renv_ `renv::deactivate()` and run the master R script after installing the following packages (and their dependencies) from CRAN: _sf_, _smoothr_, _lwgeom_, _dplyr_, _openxlsx_.
+1. Prepare admin-0 data using official world bank country polygons.
+2. Prepare non-standard subnational boundary data-files
+3. Combine subnational boundaries based on SPID master list
+ - prepare source boundary data
+ - get unmodified boundaries
+ - construct modified boundaries
+ - get missing subnational boundaries
+ - clip to Official WB admin-0 polygons
+4. Edge-match subnational boundaries to WB admin-0 polygons
+
+[^1]: The R package _renv_ is used to install the same version of packages and dependencies. In case this fails, deactivate _renv_ `renv::deactivate()` and try to run the master R script without `renv::restore` after installing the following packages (and their dependencies) from CRAN: _sf_, _smoothr_, _lwgeom_, _dplyr_, _openxlsx_.
 
 ## References
