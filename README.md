@@ -22,15 +22,15 @@ The boundary data can be used to map the [SPID](https://pipmaps.worldbank.org/en
 
 ## Instructions
 
-To run the code:
+To run the code and produce final spatial data files:
 1. Clone the repository
 2. Obtain the raw spatial data files and place them in the specified folders
 3. Prepare the SPID boundary master list excel file
-3. Open the 00.MASTER.R script
- - change line 7 to the /data directory (with raw spatial data)
- - change line 11 to the SPID boundary master list excel file path
- - change line 14 to the vintage (e.g., "AM24")
- - run the master script[^1]
+3. Open src/00.MASTER.R
+  - change line 7 to the /data directory (with raw spatial data)
+  - change line 11 to the SPID boundary master list excel file path
+  - change line 14 to the vintage (e.g., "AM24")
+  - run the script[^1]
 
 [^1]: The R package _renv_ is used to install the same version of packages and dependencies. In case this fails, you can try to deactivate _renv_ `renv::deactivate()` and run the master R script after installing the following packages (and their dependencies) from CRAN: _sf_, _smoothr_, _lwgeom_, _dplyr_, _openxlsx_.
 
