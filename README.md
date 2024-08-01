@@ -5,8 +5,11 @@ This repository includes R scripts to produce subnational boundary data files co
 The boundary data can be used to map the [Global Subnational Atlas of Poverty (GSAP)](https://pipmaps.worldbank.org/en/data/datatopics/poverty-portal/poverty-geospatial), the [Subnational Poverty and Inequality Database (SPID)](https://pipmaps.worldbank.org/en/data/datatopics/poverty-portal/poverty-interactivemap), and for estimating the population at high risk from climate-related hazards [WBG scorecard vision indicator](https://scorecard.worldbank.org/en/scorecard/our-vision#planet).
 
 ## Overview
-
-The proce
+The code completes the following tasks:
+1. Prepares the admin-0 boundary data so that it corresponds with World Bank country codes and has unique geo_codes
+2. Prepares subnational boundary data files
+3. Collates and modifie the subnational boundary data so that it corresponds with subnational samples in the SPID master list corresponding to subnational surveys in the SPID master list to boundaries in various source datasets, or modifies these boundaries in the raw data so that they match survey samples.
+4. 
 
 ## Data
 
