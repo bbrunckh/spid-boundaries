@@ -322,7 +322,7 @@ missed_regions <- st_as_sf(missed_regions) %>%
 
 # save list to check
 write.xlsx(st_drop_geometry(missed_regions),
-           paste0(spid_data,"interim/",vintage,"/missed_regions.xlsx"))
+           paste0(spid_data,"interim/",vintage,"/subnat_missing.xlsx"))
 
 unique(missed_regions$code)
 length(unique(missed_regions$geo_code))
@@ -362,14 +362,14 @@ sf_use_s2(TRUE)
 
 # subnational regions not mapped by admin-0
 dropped <- spid_noEM[!spid_noEM$geo_code %in% spid_clip$geo_code,]
-dropped # 40 small islands not included in admin0 - maybe add back later
+dropped # 40 small islands cropped out
 
-st_write(dropped,
-         paste0(spid_data,"interim/",vintage,"/",tolower(vintage),"_dropped.gpkg"),
-         append=FALSE)
+# save list to check
+write.xlsx(st_drop_geometry(dropped),
+           paste0(spid_data,"interim/",vintage,"/subnat_dropped.xlsx"))
 
-# keep only polygons
-spid_subnat <- spid_clip %>% rowwise() %>% 
+# add back cropped regions (some have survey samples) & keep polygons only
+spid_subnat <- bind_rows(spid_clip, dropped) %>% rowwise() %>% 
   mutate(geometry = st_combine(st_collection_extract(geometry, "POLYGON")))
 
 # save geopackage (masked to admin-0 but NO edge-matching)

@@ -34,23 +34,22 @@ spid_subnat <- st_read(paste0(spid_data,"final/",vintage,"/",
 
 # list of surveys
 spid_all <- bind_rows(spid_bounds, spid_miss) %>%
-  mutate(key = paste(code,year,survname,byvar))
+  mutate(key = paste(code,year,survname,byvar)) %>% arrange(key)
+
 spid_list <- rev(unique(spid_all$key))
 
-any(is.na(spid_all$key))
-
+sf_use_s2(FALSE)
 spid_em <- data.frame()
 
+# loop over surveys
 for (i in 1:length(spid_list)){
   print(spid_list[i])
   
   sample <- filter(spid_all,key==spid_list[i]) %>% 
     left_join(spid_subnat[c("geo_code", "geom")]) %>% 
-    select(geo_code, geom) %>% st_as_sf() %>% filter(!st_is_empty(geom))
+    select(geo_code, geom) %>% st_as_sf()
   
   if(any(!sample$geo_code %in% spid_em$geo_code)){
-    
-    sf_use_s2(FALSE)
     
   # target admin0 polygon
   target <- admin0[admin0$code==substr(spid_list[i],1,3),"geom"]
@@ -58,15 +57,18 @@ for (i in 1:length(spid_list)){
   # make lines from sample polygons
   samp_union <- st_union(sample) 
   outline <- st_cast(samp_union, "MULTILINESTRING")
-  lines <- st_intersection(sample, outline) %>%
-    st_collection_extract("LINESTRING") %>% st_make_valid()
+  lines <- st_intersection(sample, outline) %>% 
+    st_collection_extract("LINESTRING")
   
   # make points from lines
   points <- st_segmentize(lines,dfMaxLength = units::set_units(100,m)) %>%
-    st_cast("MULTIPOINT") %>% st_make_valid() %>% st_cast("POINT") 
+    st_cast("MULTIPOINT") %>% st_cast("POINT") %>% 
+    st_transform(3395) %>%
+    st_snap_to_grid(units::set_units(10,m)) %>% # snap to 10m grid
+    st_transform(4326) %>% 
+    distinct()
   
   # make voronoi polygons from points
-  tryCatch({ #continue with next survey if error
   voron <- st_collection_extract(st_voronoi(do.call(c,st_geometry(points)))) %>% 
     st_set_crs(st_crs(points))
   
@@ -82,9 +84,8 @@ for (i in 1:length(spid_list)){
   if (nrow(spid_em)==0){spid_em <- em}
   else{spid_em <- bind_rows(spid_em,em)}
   
-  },error=function(e) {message(paste0("topology ERROR: ",spid_list[i]))})
-  }
   print(paste0(round(100*i/length(spid_list)),"%")) # progress
+  }
 }
 
 #------------------------------------------------------------------------------#
@@ -93,24 +94,16 @@ for (i in 1:length(spid_list)){
 
 # keep first occurrence of each unique geo_code (most recent), merge with codes
 spid_em <- distinct(spid_em, geo_code, .keep_all = TRUE) %>% 
-  left_join(st_drop_geometry(spid_subnat)) %>%
+  left_join(st_drop_geometry(spid_subnat)) 
+
+# dropped regions (cropped out by admin-0 intersection)
+dropped <- spid_subnat[!spid_subnat$geo_code %in% spid_em$geo_code,] 
+dropped 
+
+# add dropped regions back in (some have samples)
+spid_em <- bind_rows(spid_em, dropped) %>%
   select(code, geo_year,geo_source,geo_level,geo_idvar,geo_id,geo_nvar,
-         geo_name,geo_code) %>% arrange(geo_code)
-
-# add back geo_codes where edge-matching failed due to topology error
-no_em <- spid_subnat[!spid_subnat$geo_code %in% spid_em$geo_code,]
-no_em # AUS, BWA, CHN - topology error: self intersection
-spid_em <- bind_rows(spid_em, no_em) %>% select(-countryname) %>% 
-  arrange(geo_code)
-spid_em
-
-# add small islands not mapped by admin0 
-dropped <- st_read(paste0(spid_data,"interim/",vintage,"/",
-                          tolower(vintage),"_dropped.gpkg"))
-dropped
-
-# Assume OK to add dropped regions back in
-spid_em <- bind_rows(spid_em, dropped) %>% select(-countryname) %>% 
+         geo_name,geo_code) %>% 
   arrange(geo_code)
 spid_em
 
@@ -139,16 +132,16 @@ length(unique(spid_bounds$geo_code))
 length(unique(spid_em$code))
 length(unique(spid_bounds$code)) 
 
-# AM24 stats: 2156 subnat regions with data from 1112 surveys in 138 countries
+# AM24 vintage: 2156 subnat regions with data from 1112 surveys in 138 countries
 
-# #visualize - check global coverage
-#   library(leaflet)
-# 
-#   map <- filter(admin0, !code %in% spid_em$code) %>%
-#     bind_rows(spid_em) %>% select(code,geo_name)
-# 
-#   leaflet(map) %>%
-#     addProviderTiles("CartoDB.Positron") %>%
-#     addPolygons(color = "green",
-#                 popup = paste("Country: ", map$code, "<br>",
-#                               "Region: ", map$geo_name, "<br>")) 
+#visualize - check global coverage
+  # library(leaflet)
+  # 
+  # map <- filter(admin0, !code %in% spid_em$code) %>%
+  #   bind_rows(spid_em) %>% select(code,geo_name)
+  # 
+  # leaflet(map) %>%
+  #   addProviderTiles("CartoDB.Positron") %>%
+  #   addPolygons(color = "green",
+  #               popup = paste("Country: ", map$code, "<br>",
+  #                             "Region: ", map$geo_name, "<br>"))
