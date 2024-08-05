@@ -6,9 +6,9 @@ The boundary data can be used to map the [Global Subnational Atlas of Poverty (G
 
 ## Overview
 The code completes the following tasks:
-1. Prepares the admin-0 boundary data so that it corresponds with World Bank country codes and has unique geo_codes
-2. Prepares subnational boundary data files
-3. Collates subnational boundary data corresponding with subnational samples in the SPID master lis, and modifies boundaries in the raw data so they match survey samples.
+1. Prepares the admin-0 boundary data so that it corresponds with World Bank country codes and has unique geo_codes.
+2. Prepares subnational boundary data files.
+3. Collates and modifies raw boundary data cso that it matches subnational samples in the SPID master list.
 4. Edge-matches subnational boundaries to admin-0 boundaries. Ensures that they form a valid planar partition, made of valid polygons and having no gaps or overlaps.
 
 ## Data
