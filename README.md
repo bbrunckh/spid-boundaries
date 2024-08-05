@@ -8,28 +8,16 @@ The boundary data can be used to map the [Global Subnational Atlas of Poverty (G
 The code completes the following tasks:
 1. Prepares the admin-0 boundary data so that it corresponds with World Bank country codes and has unique geo_codes
 2. Prepares subnational boundary data files
-3. Collates and modifie the subnational boundary data so that it corresponds with subnational samples in the SPID master list corresponding to subnational surveys in the SPID master list to boundaries in various source datasets, or modifies these boundaries in the raw data so that they match survey samples.
-4. 
+3. Collates subnational boundary data corresponding with subnational samples in the SPID master lis, and modifies boundaries in the raw data so they match survey samples.
+4. Edge-matches subnational boundaries to admin-0 boundaries. Ensures that they form a valid planar partition, made of valid polygons and having no gaps or overlaps.
 
 ## Data
 
 **World Bank Official Boundaries** are used to map admin-0 and disputed areas. Data files are available from the [Development Data Hub](https://datacatalog.worldbank.org/search/dataset/0038272/World-Bank-Official-Boundaries).
 
-**Subnational boundary data** include Global Administrative Unit Layers (GAUL) 2015, Nomenclature of Territorial Units for Statistics (NUTS), GADM (v4.1), United Nations Common Operational Datasets, and National Statistical Offices (NSOs).
+**Subnational boundary data** sources include Global Administrative Unit Layers (GAUL) 2015, Nomenclature of Territorial Units for Statistics (NUTS), GADM (v4.1), United Nations Common Operational Datasets, and National Statistical Offices (NSOs).
 
 The **SPID master list** maps each subnational household survey sample to regions mapped by the boundary data sources. This excel file provides the code with specific instructions to match and modify raw boundary data so that it corresponds with the geographic identifiers in household surveys.
-
-## Description of code files
-
-1. Prepare Admin-0 boundaries data
-2. Prepare non-standard subnational boundary data-files
-3. Combine subnational boundaries based on SPID master list
-    - prepare source boundary data
-    - get unmodified boundaries
-    - construct modified boundaries
-    - get missing subnational boundaries
-    - clip subnatinoal boundaries to admin-0 polygons
-4. Edge-match subnational boundaries to WB admin-0 polygons
 
 ## Instructions
 
@@ -44,6 +32,19 @@ To run the code and produce master spatial data files:
     - modify line 14 with the vintage (e.g., "AM24")
   
 [^1]: The R package _renv_ is used to install the same version of packages and dependencies. In case this fails, deactivate _renv_ `renv::deactivate()` and try to run the master R script without `renv::restore` after installing the following packages (and their dependencies) from CRAN: _sf_, _smoothr_, _lwgeom_, _dplyr_, _openxlsx_.
+
+## Description of code files
+
+* `00_MASTER.R` sets directories, installs packages and runs all scripts
+* `01_admin0.R` prepares admin-0 boundaries
+* `02_subnat_prep.R` prepares non-standard subnational boundary data
+* `03_subnat.R` combines subnational boundary data based on SPID master list:
+    - prepare source boundary data
+    - get unmodified boundaries
+    - construct modified boundaries
+    - look-up missing subnational boundaries
+    - clip subnational boundaries to admin-0 polygons
+* `04_edgematch.R` edge-matches subnational boundaries to admin-0 polygons
 
 ## References
 
