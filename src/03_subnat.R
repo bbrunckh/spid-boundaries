@@ -1,4 +1,4 @@
-rm(list = setdiff(ls(), c("spid_master","vintage","spid_data"))) # workspace
+rm(list = setdiff(ls(), c("spid_master","vintage","spid_data","version"))) 
 gc() # free-up unused memory
 
 # load packages
@@ -132,7 +132,7 @@ any(is.na(un$geo_id))
 
 # Subnational boundaries from NSO/other custom boundary data
 
-nso_civ2007 <- st_read(paste0(spid_data,"interim/",vintage,"/CIV_2007")) %>%
+nso_civ2007 <- st_read(paste0(spid_data,"interim/",version,"/CIV_2007")) %>%
   mutate(geo_id = as.character(ADM1_ID), code = "CIV", geo_name = ADM1,
          geo_level = "1", geo_year = 2007, countryname = "Côte d'Ivoire")
 
@@ -141,11 +141,11 @@ nso_cri2022 <- st_read(paste0(spid_data,"raw/NSO/CRI_2022")) %>%
          geo_level = "1", geo_year = 2022, countryname = "Costa Rica") %>% 
   st_transform(st_crs(4326))
 
-nso_npl2022 <- st_read(paste0(spid_data,"interim/",vintage,"/NPL_2022")) %>%
+nso_npl2022 <- st_read(paste0(spid_data,"interim/",version,"/NPL_2022")) %>%
   mutate(geo_id = as.character(FIRST_STAT), code = "NPL", geo_name = name, 
          geo_level = "1", geo_year = 2022, countryname = "Nepal")
 
-nso_sur2016 <- st_read(paste0(spid_data,"interim/",vintage,"/SUR_2016")) %>%
+nso_sur2016 <- st_read(paste0(spid_data,"interim/",version,"/SUR_2016")) %>%
   mutate(geo_id = as.character(d_code), code = "SUR", geo_name = domain,
          geo_level = "1", geo_year = 2016, countryname = "Suriname")
 
@@ -311,7 +311,7 @@ for (i in 1:length(spid_list)){
   }
 }
 
-missed_regions <- st_as_sf(missed_regions) %>% 
+missed_regions2 <- st_as_sf(missed_regions) %>% 
   filter(code!= "GMB") %>%# covered by crosswalk 
   filter(!(code=="IRN" & geo_name %in% c("Tehran","Khorasan"))) %>% # covered
   filter(!(code=="PAN" & geo_name %in% c("Panamá"))) %>% # covered
@@ -321,14 +321,14 @@ missed_regions <- st_as_sf(missed_regions) %>%
   arrange(code, year, survname, byvar)
 
 # save list to check
-write.xlsx(st_drop_geometry(missed_regions),
-           paste0(spid_data,"interim/",vintage,"/subnat_missing.xlsx"))
+write.xlsx(st_drop_geometry(missed_regions2),
+           paste0(spid_data,"interim/",version,"/subnat_missing.xlsx"))
 
-unique(missed_regions$code)
-length(unique(missed_regions$geo_code))
+unique(missed_regions2$code)
+length(unique(missed_regions2$geo_code))
 
 # filter to unique missed regions not in main spid list
-spid_missed <- unique(missed_regions[c("code", "geo_year","geo_source",
+spid_missed <- unique(missed_regions2[c("code", "geo_year","geo_source",
                       "geo_level","geo_idvar","geo_id",
                       "geo_nvar","geo_name","geo_code","geometry")]) %>% 
   filter(!geo_code %in% spid_bounds$geo_code) 
@@ -343,14 +343,14 @@ spid_noEM <- bind_rows(spid_nomod, spid_mod, spid_missed) %>%
 
 # clip to admin-0 boundary
 rm(spid_clip)
-wb0 <- st_read(paste0(spid_data,"final/",vintage,"/",
+wb0 <- st_read(paste0(spid_data,"final/",version,"/",
                       tolower(vintage),"_admin0.gpkg"))
 sf_use_s2(FALSE)
 
 for (i in unique(spid_noEM$code)){
   print(i)
-  clipped <- st_intersection(spid_noEM[spid_noEM$code==i,],
-                             wb0[wb0$code==i,"geom"])
+  target <- filter(wb0,geo_code == paste0(i,"_2023_WB0")) %>% select(geom)
+  clipped <- filter(spid_noEM, code==i) %>% st_intersection(target)
   if (!exists("spid_clip")){spid_clip <- clipped}
   else{spid_clip <- bind_rows(spid_clip,clipped)}
 }
@@ -362,11 +362,11 @@ sf_use_s2(TRUE)
 
 # subnational regions not mapped by admin-0
 dropped <- spid_noEM[!spid_noEM$geo_code %in% spid_clip$geo_code,]
-dropped # 40 small islands cropped out
+dropped # 9 small islands cropped out
 
 # save list to check
 write.xlsx(st_drop_geometry(dropped),
-           paste0(spid_data,"interim/",vintage,"/subnat_dropped.xlsx"))
+           paste0(spid_data,"interim/",version,"/subnat_dropped.xlsx"))
 
 # add back cropped regions (some have survey samples) & keep polygons only
 spid_subnat <- bind_rows(spid_clip, dropped) %>% rowwise() %>% 
@@ -374,10 +374,10 @@ spid_subnat <- bind_rows(spid_clip, dropped) %>% rowwise() %>%
 
 # save geopackage (masked to admin-0 but NO edge-matching)
 st_write(spid_subnat,
-         paste0(spid_data,"final/",vintage,"/",tolower(vintage),"_subnat.gpkg"),
+         paste0(spid_data,"final/",version,"/",tolower(vintage),"_subnat.gpkg"),
          append=FALSE)
 
 # save shapefile
 st_write(spid_subnat,
-         paste0(spid_data,"final/",vintage,"/",tolower(vintage),"_subnat.shp"),
+         paste0(spid_data,"final/",version,"/",tolower(vintage),"_subnat.shp"),
          append=FALSE)

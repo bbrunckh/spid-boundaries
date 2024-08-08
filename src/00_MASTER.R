@@ -15,9 +15,12 @@ vintage <- "AM24"
 
 #------------------------------------------------------------------------------#
 
-# create data folders for SPID vintage
-dir.create(paste0(spid_data,"interim/",vintage))
-dir.create(paste0(spid_data,"final/",vintage))
+# add date stamp to vintage
+version <- paste0(vintage,"_",Sys.Date())
+
+# create output data folders for version
+dir.create(paste0(spid_data,"interim/",version))
+dir.create(paste0(spid_data,"final/",version))
 
 # install packages using renv
 renv::restore()

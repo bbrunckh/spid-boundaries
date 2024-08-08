@@ -1,4 +1,4 @@
-rm(list = setdiff(ls(), c("spid_master","vintage","spid_data"))) # workspace
+rm(list = setdiff(ls(), c("spid_master","vintage","spid_data","version")))
 gc() # free-up unused memory
 
 # load packages
@@ -18,9 +18,9 @@ NPL <- st_read(paste0(spid_data,"raw/NSO/NPL_2022"))
 NPL$name <- c("Koshi","Madhesh","Bagmati","Gandaki","Lumbini","Karnali",
               "Sudurpashchim")
 
-dir.create(paste0(spid_data,"interim/",vintage,"/NPL_2022"))
+dir.create(paste0(spid_data,"interim/",version,"/NPL_2022"))
 st_write(NPL[,c(2,4)],
-         paste0(spid_data,"interim/",vintage,"/NPL_2022/NPL_2022.shp"),
+         paste0(spid_data,"interim/",version,"/NPL_2022/NPL_2022.shp"),
          append=FALSE)
 
 #------------------------------------------------------------------------------#
@@ -60,9 +60,9 @@ CIV <- group_by(CIV, ADM0, ADM1) %>%
   mutate(code = "CIV", ADM1_ID = row_number()) %>%
   select(code, ADM0, ADM1_ID, ADM1)
 
-dir.create(paste0(spid_data,"interim/",vintage,"/CIV_2007"))
+dir.create(paste0(spid_data,"interim/",version,"/CIV_2007"))
 st_write(CIV,
-         paste0(spid_data,"interim/",vintage,"/CIV_2007/CIV_2007.shp"),
+         paste0(spid_data,"interim/",version,"/CIV_2007/CIV_2007.shp"),
          append=FALSE)
 
 #------------------------------------------------------------------------------#
@@ -83,9 +83,9 @@ SUR_coast <- left_join(SUR_CA,SUR_domains) %>%
 
 SUR_coast
 
-SUR0 <- st_read(paste0(spid_data,"final/",vintage,"/",
+SUR0 <- st_read(paste0(spid_data,"final/",version,"/",
                        tolower(vintage),"_admin0.gpkg")) %>%
-  filter(code=="SUR") %>% rename(geometry=geom) %>%
+  filter(geo_code=="SUR_2023_WB0") %>% rename(geometry=geom) %>%
   st_transform(st_crs(SUR_coast))
 
 SUR_int <- st_difference(SUR0,st_union(SUR_coast)) %>%
@@ -122,7 +122,7 @@ em <- mutate(points,geometry = voron[unlist(st_intersects(points,voron))]) %>%
 
 SUR <- st_transform(em, 4326) 
 SUR$d_code <- c(1,3,2)
-dir.create(paste0(spid_data,"interim/",vintage,"/SUR_2016"))
+dir.create(paste0(spid_data,"interim/",version,"/SUR_2016"))
 st_write(SUR[,c("domain","d_code")],
-         paste0(spid_data,"interim/",vintage,"/SUR_2016/SUR_2016.shp"),
+         paste0(spid_data,"interim/",version,"/SUR_2016/SUR_2016.shp"),
          append=FALSE)

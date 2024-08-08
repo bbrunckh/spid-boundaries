@@ -1,4 +1,4 @@
-rm(list = setdiff(ls(), c("spid_master","vintage","spid_data"))) # workspace
+rm(list = setdiff(ls(), c("spid_master","vintage","spid_data","version"))) 
 gc() # free-up unused memory
 
 # load packages
@@ -22,10 +22,10 @@ spid_miss <- read.xlsx(spid_master, sheet = "SPID missing boundaries")
 # admin-0 and AM24 subnational boundaries
 #------------------------------------------------------------------------------#
 
-admin0 <- st_read(paste0(spid_data,"final/",vintage,"/",
+admin0 <- st_read(paste0(spid_data,"final/",version,"/",
                          tolower(vintage),"_admin0.gpkg"))
 
-spid_subnat <- st_read(paste0(spid_data,"final/",vintage,"/",
+spid_subnat <- st_read(paste0(spid_data,"final/",version,"/",
                               tolower(vintage),"_subnat.gpkg"))
 
 #------------------------------------------------------------------------------#
@@ -52,7 +52,9 @@ for (i in 1:length(spid_list)){
   if(any(!sample$geo_code %in% spid_em$geo_code)){
     
   # target admin0 polygon
-  target <- admin0[admin0$code==substr(spid_list[i],1,3),"geom"]
+  target <- filter(admin0, 
+                   geo_code == paste0(substr(spid_list[i],1,3),"_2023_WB0")) %>%
+                     select(geom)
     
   # make lines from sample polygons
   samp_union <- st_union(sample) 
@@ -61,10 +63,10 @@ for (i in 1:length(spid_list)){
     st_collection_extract("LINESTRING")
   
   # make points from lines
-  points <- st_segmentize(lines,dfMaxLength = units::set_units(100,m)) %>%
+  points <- st_segmentize(lines,dfMaxLength = units::set_units(1000,m)) %>%
     st_cast("MULTIPOINT") %>% st_cast("POINT") %>% 
     st_transform(3395) %>%
-    st_snap_to_grid(units::set_units(10,m)) %>% # snap to 10m grid
+    st_snap_to_grid(units::set_units(100,m)) %>% # snap to 100m grid
     st_transform(4326) %>% 
     distinct()
   
@@ -112,12 +114,12 @@ any(!st_is_valid(spid_em)) # All valid if FALSE
 
 #save EM geopackage
 st_write(spid_em,
-         paste0(spid_data,"final/",vintage,"/",tolower(vintage),"_subnat_em.gpkg"),
+         paste0(spid_data,"final/",version,"/",tolower(vintage),"_subnat_em.gpkg"),
          append=FALSE)
 
 # save EM shapefile
 st_write(spid_em,
-         paste0(spid_data,"final/",vintage,"/",tolower(vintage),"_subnat_em.shp"),
+         paste0(spid_data,"final/",version,"/",tolower(vintage),"_subnat_em.shp"),
          append=FALSE)
 
 #checks
