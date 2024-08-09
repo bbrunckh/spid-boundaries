@@ -85,7 +85,7 @@ SUR_coast
 
 SUR0 <- st_read(paste0(spid_data,"final/",version,"/",
                        tolower(vintage),"_admin0.gpkg")) %>%
-  filter(geo_code=="SUR_2023_WB0") %>% rename(geometry=geom) %>%
+  filter(geo_code=="SUR_2020_WB0") %>% rename(geometry=geom) %>%
   st_transform(st_crs(SUR_coast))
 
 SUR_int <- st_difference(SUR0,st_union(SUR_coast)) %>%

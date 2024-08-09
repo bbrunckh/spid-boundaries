@@ -349,7 +349,7 @@ sf_use_s2(FALSE)
 
 for (i in unique(spid_noEM$code)){
   print(i)
-  target <- filter(wb0,geo_code == paste0(i,"_2023_WB0")) %>% select(geom)
+  target <- filter(wb0,geo_code == paste0(i,"_2020_WB0")) %>% select(geom)
   clipped <- filter(spid_noEM, code==i) %>% st_intersection(target)
   if (!exists("spid_clip")){spid_clip <- clipped}
   else{spid_clip <- bind_rows(spid_clip,clipped)}

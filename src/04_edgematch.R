@@ -28,6 +28,9 @@ admin0 <- st_read(paste0(spid_data,"final/",version,"/",
 spid_subnat <- st_read(paste0(spid_data,"final/",version,"/",
                               tolower(vintage),"_subnat.gpkg"))
 
+dropped <- read.xlsx(paste0(spid_data,"interim/",version,
+                            "/subnat_dropped.xlsx"))
+
 #------------------------------------------------------------------------------#
 # Edge match subnational boundaries to admin-0 - Voronoi method
 #------------------------------------------------------------------------------#
@@ -49,11 +52,13 @@ for (i in 1:length(spid_list)){
     left_join(spid_subnat[c("geo_code", "geom")]) %>% 
     select(geo_code, geom) %>% st_as_sf()
   
-  if(any(!sample$geo_code %in% spid_em$geo_code)){
+  done <- select(dropped, geo_code) %>% bind_rows(st_drop_geometry(spid_em))
+  
+  if(any(!sample$geo_code %in% done$geo_code)){
     
   # target admin0 polygon
   target <- filter(admin0, 
-                   geo_code == paste0(substr(spid_list[i],1,3),"_2023_WB0")) %>%
+                   geo_code == paste0(substr(spid_list[i],1,3),"_2020_WB0")) %>%
                      select(geom)
     
   # make lines from sample polygons
@@ -99,11 +104,11 @@ spid_em <- distinct(spid_em, geo_code, .keep_all = TRUE) %>%
   left_join(st_drop_geometry(spid_subnat)) 
 
 # dropped regions (cropped out by admin-0 intersection)
-dropped <- spid_subnat[!spid_subnat$geo_code %in% spid_em$geo_code,] 
-dropped 
+dropped2 <- filter(spid_subnat,!geo_code %in% spid_em$geo_code) 
+dropped2 
 
 # add dropped regions back in (some have samples)
-spid_em <- bind_rows(spid_em, dropped) %>%
+spid_em <- bind_rows(spid_em, dropped2) %>%
   select(code, geo_year,geo_source,geo_level,geo_idvar,geo_id,geo_nvar,
          geo_name,geo_code) %>% 
   arrange(geo_code)
@@ -134,16 +139,4 @@ length(unique(spid_bounds$geo_code))
 length(unique(spid_em$code))
 length(unique(spid_bounds$code)) 
 
-# AM24 vintage: 2156 subnat regions with data from 1112 surveys in 138 countries
-
-#visualize - check global coverage
-  # library(leaflet)
-  # 
-  # map <- filter(admin0, !code %in% spid_em$code) %>%
-  #   bind_rows(spid_em) %>% select(code,geo_name)
-  # 
-  # leaflet(map) %>%
-  #   addProviderTiles("CartoDB.Positron") %>%
-  #   addPolygons(color = "green",
-  #               popup = paste("Country: ", map$code, "<br>",
-  #                             "Region: ", map$geo_name, "<br>"))
+# AM24 vintage: 2156 subnat regions with data from 1113 surveys in 138 countries
