@@ -2,10 +2,10 @@ rm(list = setdiff(ls(), c("spid_master","vintage","spid_data","version")))
 gc() # free-up unused memory
 
 # load packages
-library(sf)
-library(lwgeom)
 library(openxlsx)
 library(dplyr)
+library(sf)
+library(lwgeom)
 
 #------------------------------------------------------------------------------#
 # SPID boundary key - AM24
@@ -60,13 +60,13 @@ for (i in 1:length(spid_list)){
   samp_union <- st_union(sample) 
   outline <- st_cast(samp_union, "MULTILINESTRING")
   lines <- st_intersection(sample, outline) %>% 
-    st_collection_extract("LINESTRING")
+    st_collection_extract("LINESTRING") %>% st_make_valid()
   
   # make points from lines
-  points <- st_segmentize(lines,dfMaxLength = units::set_units(1000,m)) %>%
+  points <- st_segmentize(lines,dfMaxLength = units::set_units(100,m)) %>%
     st_cast("MULTIPOINT") %>% st_cast("POINT") %>% 
     st_transform(3395) %>%
-    st_snap_to_grid(units::set_units(100,m)) %>% # snap to 100m grid
+    st_snap_to_grid(units::set_units(10,m)) %>% # snap to 10m grid
     st_transform(4326) %>% 
     distinct()
   

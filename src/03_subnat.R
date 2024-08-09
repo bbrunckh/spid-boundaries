@@ -2,10 +2,10 @@ rm(list = setdiff(ls(), c("spid_master","vintage","spid_data","version")))
 gc() # free-up unused memory
 
 # load packages
-library(sf)
-library(smoothr)
 library(openxlsx)
 library(dplyr)
+library(sf)
+library(smoothr)
 
 #------------------------------------------------------------------------------#
 # SPID boundary master list
@@ -362,7 +362,7 @@ sf_use_s2(TRUE)
 
 # subnational regions not mapped by admin-0
 dropped <- spid_noEM[!spid_noEM$geo_code %in% spid_clip$geo_code,]
-dropped # 9 small islands cropped out
+dropped # 40 small islands cropped out
 
 # save list to check
 write.xlsx(st_drop_geometry(dropped),
