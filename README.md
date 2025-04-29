@@ -1,6 +1,6 @@
 # Boundaries for subnational household surveys
 
-This repository includes R scripts to produce subnational boundary data defining spatial units represented by household surveys. 
+This repository includes code to produce subnational boundary data for spatial units represented in household surveys. 
 
 Statistics at the level of these spatial units are considered representative of the population living in these areas. These regions depend on the sampling design of the household survey. Many correspond with the first level of subnational administrative divisions within a country.
 
