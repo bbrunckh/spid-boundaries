@@ -3,15 +3,17 @@
 #                             R master script                                  #
 #------------------------------------------------------------------------------#
 
+# set vintage
+vintage <- "SM25"
+
 # set directory to boundary data
-spid_data <- paste0("/Users/bbrunckhorst/Library/CloudStorage/OneDrive-WBG/",
+spid_data <- paste0("~/Library/CloudStorage/OneDrive-WBG/",
                     "spid-boundaries/data/")
 
 # set path to SPID master list (xlsx)
-spid_master <- paste0("/Users/bbrunckhorst/Library/CloudStorage/OneDrive-WBG/",
-                      "Subnational/04.output/SPID boundaries.xlsx")
-# set vintage
-vintage <- "AM24"
+spid_master <- paste0("~/Library/CloudStorage/OneDrive-WBG/",
+                      "/Minh\ Cong\ Nguyen\'s\ files\ -\ Subnational/",
+                      "02.input/SPID\ boundaries\ SM25.xlsx")
 
 #------------------------------------------------------------------------------#
 
@@ -24,6 +26,10 @@ dir.create(paste0(spid_data,"final/",version))
 
 # install packages using renv
 renv::restore()
+
+# # install packages (without using renv)
+# renv::deactivate()
+# install.packages(c("dplyr", "lwgeom", "sf", "smoothr", "openxlsx"))
 
 # run scripts
 source("01_admin0.R")

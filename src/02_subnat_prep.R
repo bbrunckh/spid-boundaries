@@ -4,7 +4,7 @@ gc() # free-up unused memory
 # load packages
 library(sf)
 library(lwgeom)
-library(openxlsx)
+library(openxlsx2)
 library(dplyr)
 
 #------------------------------------------------------------------------------#
@@ -55,9 +55,9 @@ CIV  <- mutate(CIV,ADM1 = case_when(
   ID %in% c(54,55,57,60,66,67,68,69,72,73,76,85,101,109) ~ "Worodougou",
   ID %in% c(1,2,51,52,53,77,78,79,183,185,186) ~ "Zanzan"))
 
-CIV <- group_by(CIV, ADM0, ADM1) %>%
-  summarise(geometry = st_union(geometry)) %>%
-  mutate(code = "CIV", ADM1_ID = row_number()) %>%
+CIV <- group_by(CIV, ADM0, ADM1) |>
+  summarise(geometry = st_union(geometry)) |>
+  mutate(code = "CIV", ADM1_ID = row_number()) |>
   select(code, ADM0, ADM1_ID, ADM1)
 
 dir.create(paste0(spid_data,"interim/",version,"/CIV_2007"))
@@ -72,52 +72,52 @@ st_write(CIV,
 # SUR SSLC domains are defined by electricity Connection Areas
   # source: Connection areas shapefile provided by survey firm
 
-SUR_domains <- read.xlsx(paste0(spid_data,
+SUR_domains <- read_xlsx(paste0(spid_data,
                                 "raw/NSO/SUR_2016/CA domains.xlsx"))
 SUR_CA <- st_read(paste0(spid_data,"raw/NSO/SUR_2016"))
 SUR_CA$CA <- gsub("Wijk ", "", SUR_CA$Wijknaam)
 
-SUR_coast <- left_join(SUR_CA,SUR_domains) %>% 
-  group_by(domain) %>%
+SUR_coast <- left_join(SUR_CA,SUR_domains) |> 
+  group_by(domain) |>
   summarize(geometry = st_union(geometry))
 
 SUR_coast
 
 SUR0 <- st_read(paste0(spid_data,"final/",version,"/",
-                       tolower(vintage),"_admin0.gpkg")) %>%
-  filter(geo_code=="SUR_2020_WB0") %>% rename(geometry=geom) %>%
+                       tolower(vintage),"_admin0.gpkg")) |>
+  filter(geo_code=="SUR_2020_WB0") |> rename(geometry=geom) |>
   st_transform(st_crs(SUR_coast))
 
-SUR_int <- st_difference(SUR0,st_union(SUR_coast)) %>%
-  st_cast("POLYGON") %>% st_as_sf() %>%
-  filter(st_area(.) > units::set_units(100,"km^2")) # remove crumbs
+SUR_int <- st_difference(SUR0,st_union(SUR_coast)) |>
+  st_cast("POLYGON") |> st_as_sf() |>
+  filter(st_area(geometry) > units::set_units(100,"km^2")) # remove crumbs
 
 SUR_int$domain <- "Interior"
 
-sample <- bind_rows(SUR_coast, SUR_int["domain"]) %>% st_as_sf()
+sample <- bind_rows(SUR_coast, SUR_int["domain"]) |> st_as_sf()
 
 # Edge matching
 # make lines from polygons
 samp_union <- st_union(sample) 
 outline <- st_cast(samp_union, "MULTILINESTRING")
-lines <- st_intersection(sample, outline) %>%
-  st_collection_extract("LINESTRING") %>% st_make_valid()
+lines <- st_intersection(sample, outline) |>
+  st_collection_extract("LINESTRING") |> st_make_valid()
 
 # make points from lines
-points <- st_segmentize(lines,dfMaxLength = units::set_units(100,m)) %>%
-  st_cast("MULTIPOINT") %>% st_make_valid() %>% st_cast("POINT") 
+points <- st_segmentize(lines,dfMaxLength = units::set_units(100,m)) |>
+  st_cast("MULTIPOINT") |> st_make_valid() |> st_cast("POINT") 
 
 # make voronoi polygons from points
-voron <- st_collection_extract(st_voronoi(do.call(c,st_geometry(points)))) %>% 
+voron <- st_collection_extract(st_voronoi(do.call(c,st_geometry(points)))) |> 
   st_set_crs(st_crs(points))
 
 # combine voronoi and subnat polygons, intersect with admin-0, keep polygons
-em <- mutate(points,geometry = voron[unlist(st_intersects(points,voron))]) %>%
-  st_make_valid()%>% group_by(domain) %>% 
-  summarize(geometry=st_union(geometry)) %>%
-  st_difference(samp_union) %>% rbind(sample) %>%
-  group_by(domain) %>% summarize(geometry=st_union(geometry)) %>% 
-  st_intersection(SUR0) %>% rowwise() %>% 
+em <- mutate(points,geometry = voron[unlist(st_intersects(points,voron))]) |>
+  st_make_valid()|> group_by(domain) |> 
+  summarize(geometry=st_union(geometry)) |>
+  st_difference(samp_union) |> rbind(sample) |>
+  group_by(domain) |> summarize(geometry=st_union(geometry)) |> 
+  st_intersection(SUR0) |> rowwise() |> 
   mutate(geometry = st_combine(st_collection_extract(geometry, "POLYGON")))
 
 SUR <- st_transform(em, 4326) 
