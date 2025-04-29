@@ -2,7 +2,7 @@
 
 This repository includes R scripts to produce subnational boundary data defining spatial units represented by household surveys. 
 
-Statistics at the level of these spatial units are considered representative of the population living in these areas. These regions depend on the sampling design of the household survey. Many correspond with the first level of subnational administrative divisions within a country, but this is not always the case.
+Statistics at the level of these spatial units are considered representative of the population living in these areas. These regions depend on the sampling design of the household survey. Many correspond with the first level of subnational administrative divisions within a country.
 
 The boundary data is used to map the [Global Subnational Atlas of Poverty (GSAP)](https://pipmaps.worldbank.org/en/data/datatopics/poverty-portal/poverty-geospatial), the [Subnational Poverty and Inequality Database (SPID)](https://pipmaps.worldbank.org/en/data/datatopics/poverty-portal/poverty-interactivemap), and for estimating the population at high risk from climate-related hazards [WBG scorecard vision indicator](https://scorecard.worldbank.org/en/scorecard/our-vision#planet).
 
