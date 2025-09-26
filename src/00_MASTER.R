@@ -4,7 +4,7 @@
 #------------------------------------------------------------------------------#
 
 # set vintage
-vintage <- "SM25"
+vintage <- "AM25"
 
 # set directory to boundary data
 spid_data <- paste0("~/Library/CloudStorage/OneDrive-WBG/",
@@ -12,8 +12,8 @@ spid_data <- paste0("~/Library/CloudStorage/OneDrive-WBG/",
 
 # set path to SPID master list (xlsx)
 spid_master <- paste0("~/Library/CloudStorage/OneDrive-WBG/",
-                      "/Minh\ Cong\ Nguyen\'s\ files\ -\ Subnational/",
-                      "02.input/SPID\ boundaries\ SM25.xlsx")
+                      "Minh\ Cong\ Nguyen\'s\ files\ -\ Subnational\ 1/",
+                      "02.input/SPID\ boundaries\ AM25.xlsx")
 
 #------------------------------------------------------------------------------#
 

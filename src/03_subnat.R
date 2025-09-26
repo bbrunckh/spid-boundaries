@@ -14,7 +14,7 @@ library(dplyr)
 # SPID boundary key
 spid_bounds <- read_xlsx(spid_master, sheet = "SPID boundaries") |>
   filter(!is.na(geo_code)) |> # drop samples not mapped
-  filter(is.na(new) | new == "x") |> # drop samples marked
+  filter(!new %in% c("drop")) |> # drop samples marked
   select(-new) 
 
 # SPID modified boundary key
@@ -24,7 +24,8 @@ spid_x <- read_xlsx(spid_master, sheet = "SPID modified boundaries") |>
 mode(spid_x$geo_level)
 
 # Country codes
-admin0_codes <- read_xlsx(spid_master, sheet = "admin0 codes")
+admin0_codes <- read_xlsx(spid_master, sheet = "admin0 codes") |>
+  distinct(code, ADM0_CODE, CNTR_CODE, NUTS_CNTR_NAME)
 
 # CHECKS
 
@@ -80,6 +81,8 @@ any(is.na(gaul2015$geo_id))
 
 # Subnational boundaries from NUTS (EU +)
 
+nuts24 <- st_read(paste0(spid_data,"raw/NUTS/NUTS_RG_01M_2024_4326.shp")) |>
+  mutate(geo_year = 2024)
 nuts21 <- st_read(paste0(spid_data,"raw/NUTS/NUTS_RG_01M_2021_4326.shp")) |>
   mutate(geo_year = 2021)
 nuts13<- st_read(paste0(spid_data,"raw//NUTS/NUTS_RG_01M_2013_4326.shp")) |>
@@ -87,7 +90,7 @@ nuts13<- st_read(paste0(spid_data,"raw//NUTS/NUTS_RG_01M_2013_4326.shp")) |>
 nuts06<- st_read(paste0(spid_data,"raw/NUTS/NUTS_RG_01M_2006_4326.shp")) |>
   mutate(geo_year = 2006)
 
-nuts <- bind_rows(nuts21,nuts13,nuts06) |>
+nuts <- bind_rows(nuts24,nuts21,nuts13,nuts06) |>
   left_join(admin0_codes[c("code","CNTR_CODE", "NUTS_CNTR_NAME")]) |>
   mutate(geo_id =as.character(NUTS_ID),
          geo_name = NAME_LATN,
@@ -134,7 +137,7 @@ un <- bind_rows(un_bwa2011,un_mar2023,un_rus2022,un_syc2010) |>
   
 any(is.na(un$geo_id))
 
-# Subnational boundaries from NSO/other custom boundary data
+# Subnational boundaries from NSO/other or custom boundary data
 
 nso_civ2007 <- st_read(paste0(spid_data,"interim/",version,"/CIV_2007")) |>
   mutate(geo_id = as.character(ADM1_ID), code = "CIV", geo_name = ADM1,
@@ -158,8 +161,8 @@ nso_wsm2011 <- st_read(paste0(spid_data,"raw/NSO/WSM_2011")) |>
          geo_level = "1", geo_year = 2011, countryname = "Samoa")
 
 dhs_civ2005 <- st_read(paste0(spid_data,"raw/DHS/CIV_2005")) |>
-  mutate(geo_id = as.character(REGCODE), code = "WSM", geo_name = DHSREGFR, 
-         geo_level = "1", geo_year = 2005, countryname = "Samoa")
+  mutate(geo_id = as.character(REGCODE), code = "CIV", geo_name = DHSREGFR, 
+         geo_level = "1", geo_year = 2005, countryname = "Côte d'Ivoire")
 
 nso <- bind_rows(nso_civ2007,nso_cri2022,nso_npl2022,nso_sur2016,nso_wsm2011,
                  dhs_civ2005)
@@ -172,31 +175,31 @@ any(is.na(nso$geo_id))
   
 # GAUL 
 spid_gaul <- filter(spid_bounds,geo_source=="GAUL" & geo_level!="x") |> 
-  select(c(1,7:14)) |> distinct(geo_code, .keep_all=TRUE)  |> 
-  left_join(gaul2015[c("countryname","geo_id")])
+  select(c(1,7:14)) |> distinct(geo_code, .keep_all=TRUE) |>
+  left_join(select(gaul2015, countryname, geo_id))
 
 # NUTS 
 spid_nuts <- filter(spid_bounds,geo_source=="NUTS" & geo_level!="x") |> 
-  select(c(1,7:14)) |> distinct(geo_code, .keep_all=TRUE)  |> 
-  left_join(nuts[c("countryname","geo_id")])
+  select(c(1,7:14)) |> distinct(geo_code, .keep_all=TRUE) |>
+  left_join(select(nuts, countryname, geo_id))
 
 # GADM
 spid_gadm <- filter(spid_bounds,geo_source=="GADM" & geo_level!="x") |> 
-  select(c(1,7:14)) |> distinct(geo_code, .keep_all=TRUE)  |> 
-  left_join(gadm41[c("countryname","geo_id")])
+  select(c(1,7:14)) |> distinct(geo_code, .keep_all=TRUE) |>
+  left_join(select(gadm41, countryname, geo_id))
 
 # UN COD
 spid_un <- filter(spid_bounds,geo_source=="UN" & geo_level!="x") |> 
-  select(c(1,7:14)) |> distinct(geo_code, .keep_all=TRUE)  |> 
-  left_join(un[c("countryname","geo_id")])
+  select(c(1,7:14)) |> distinct(geo_code, .keep_all=TRUE) |>
+  left_join(select(un, countryname, geo_id))
 
 # NSO/other
 spid_nso <- filter(spid_bounds,geo_source %in% c("NSO", "DHS") & geo_level!="x") |> 
-  select(c(1,7:14)) |> distinct(geo_code, .keep_all=TRUE)  |> 
-  left_join(nso[c("code","countryname","geo_id")])
+  select(c(1,7:14)) |> distinct(geo_code, .keep_all=TRUE) |>
+  left_join(select(nso, code, countryname, geo_year, geo_level, geo_id))
 
 # ALL boundaries not to modify
-spid_nomod <- bind_rows(spid_gaul, spid_nuts, spid_gadm, spid_un, spid_nso) |>
+spid_nomod <- bind_rows(spid_gaul, spid_nuts, spid_gadm, spid_un, spid_nso) |> 
   st_as_sf()
 
 #------------------------------------------------------------------------------#
@@ -343,6 +346,7 @@ diff_miss <- setdiff(st_drop_geometry(missed_regions2),
 diff_miss
 
 wb <- wb_load(spid_master) |>
+  wb_clean_sheet(sheet = "SPID missing boundaries") |>
   wb_add_data(st_drop_geometry(missed_regions2), 
               sheet = "SPID missing boundaries",
               na.strings = "") |>
@@ -370,7 +374,7 @@ sf_use_s2(FALSE)
 
 for (i in unique(spid_noEM$code)){
   print(i)
-  target <- filter(wb0,geo_code == paste0(i,"_2020_WB0")) |> select(geom)
+  target <- filter(wb0,geo_code == paste0(i,"_2025_WB0")) |> select(geom)
   clipped <- filter(spid_noEM, code==i) |> st_intersection(target)
   if (!exists("spid_clip")){spid_clip <- clipped}
   else{spid_clip <- bind_rows(spid_clip,clipped)}

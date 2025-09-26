@@ -58,7 +58,7 @@ for (i in 1:length(spid_list)){
     
   # target admin0 polygon
   target <- filter(admin0, 
-                   geo_code == paste0(substr(spid_list[i],1,3),"_2020_WB0")) |>
+                   geo_code == paste0(substr(spid_list[i],1,3),"_2025_WB0")) |>
                      select(geom)
   
   # make lines from sample polygons
@@ -114,8 +114,11 @@ spid_em <- bind_rows(spid_em, dropped2) |>
   arrange(geo_code)
 spid_em
 
+# check duplicates
+any(duplicated(spid_em$geo_code)) # no duplicates if FALSE
+
 # check valid
-any(!st_is_valid(spid_em)) # All valid if FALSE
+any(!st_is_valid(spid_em)) # all valid if FALSE
 
 #save EM geopackage
 st_write(spid_em,
@@ -141,3 +144,4 @@ length(unique(spid_bounds$code))
 
 # AM24 vintage: 2156 subnat regions with data from 1113 surveys in 138 countries
 # SM25 vintage: 2261 subnat regions with data from 1243 surveys in 143 countries
+# AM25 vintage: 2270 subnat regions with data from 1288 surveys in 143 countries
