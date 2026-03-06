@@ -30,29 +30,27 @@ admin0_codes <- read_xlsx(spid_master, sheet = "admin0 codes") |>
 # CHECKS
 
 # no duplicate boundary ids in same survey
-group_by(spid_bounds,code,year,survname, byvar) |> filter(duplicated(geo_id))
-group_by(spid_bounds,code,year,survname, byvar)|>filter(duplicated(geo_name))
-group_by(spid_bounds,code,year,survname,byvar)|> filter(duplicated(geo_code))
+stopifnot(nrow(group_by(spid_bounds,code,year,survname, byvar) |> filter(duplicated(geo_id))) == 0)
+stopifnot(nrow(group_by(spid_bounds,code,year,survname, byvar) |> filter(duplicated(geo_name))) == 0)
+stopifnot(nrow(group_by(spid_bounds,code,year,survname,byvar) |> filter(duplicated(geo_code))) == 0)
 
-group_by(spid_x,geo_code) |> filter(duplicated(geo_id))
-group_by(spid_x,geo_code) |> filter(duplicated(geo_name))
+stopifnot(nrow(group_by(spid_x,geo_code) |> filter(duplicated(geo_id))) == 0)
+stopifnot(nrow(group_by(spid_x,geo_code) |> filter(duplicated(geo_name) & geo_name != "Administrative unit not available")) == 0)
 
 # survey has consistent geo_source and geo_year
-group_by(spid_bounds,code,year,survname,byvar) |> 
-  filter(length(unique(geo_year))>1)
-group_by(spid_bounds,code,year,survname,byvar) |> 
-  filter(length(unique(geo_source))>1)
+stopifnot(nrow(group_by(spid_bounds,code,year,survname,byvar) |> filter(length(unique(geo_year))>1)) == 0)
+stopifnot(nrow(group_by(spid_bounds,code,year,survname,byvar) |> filter(length(unique(geo_source))>1)) == 0)
 
-group_by(spid_x,geo_code) |> filter(length(unique(geo_year))>1)
-group_by(spid_x,geo_code) |> filter(length(unique(geo_source))>1)
+stopifnot(nrow(group_by(spid_x,geo_code) |> filter(length(unique(geo_year))>1)) == 0)
+stopifnot(nrow(group_by(spid_x,geo_code) |> filter(length(unique(geo_source))>1)) == 0)
 
 # check all modified boundaries are defined
-spid_bounds[spid_bounds$geo_level=="x" &
-              !spid_bounds$geo_code %in% spid_x$geo_code,]
+stopifnot(nrow(spid_bounds[spid_bounds$geo_level=="x" &
+              !spid_bounds$geo_code %in% spid_x$geo_code,]) == 0)
 
-# check surveys with different geo levels 
-levels <- group_by(spid_bounds,code,year,survname, byvar) |>
-  filter(length(unique(geo_level))>1)
+# # check surveys with different geo levels 
+# levels <- group_by(spid_bounds,code,year,survname, byvar) |>
+#   filter(length(unique(geo_level))>1)
 
 #------------------------------------------------------------------------------#
 # Subnational boundary data sources
@@ -78,6 +76,23 @@ gaul2015 <- bind_rows(gaul0,gaul1,gaul2) |>
   left_join(admin0_codes[c("code","ADM0_CODE")])
 
 any(is.na(gaul2015$geo_id))
+
+
+# Subnational boundaries from GAUL 2024
+gaul1 <- st_read(paste0(spid_data,"raw/GAUL2024/GAUL_2024_L1")) |>
+  mutate(geo_level = "1")
+gaul2 <- st_read(paste0(spid_data,"raw//GAUL2024/GAUL_2024_L2"), 
+                 crs = st_crs(gaul1)) |>
+  mutate(geo_level = "2")
+
+gaul2024 <- bind_rows(gaul0,gaul1,gaul2) |>
+  mutate(geo_id =as.character(if_else(!is.na(gaul2_code),gaul2_code, gaul1_code)),
+         geo_name =if_else(!is.na(gaul2_name),gaul2_name, gaul1_name),
+         geo_year = 2024,
+         countryname = gaul0_name,
+         code = iso3_code) 
+
+any(is.na(gaul2024$geo_id))
 
 # Subnational boundaries from NUTS (EU +)
 
@@ -173,10 +188,15 @@ any(is.na(nso$geo_id))
 # Boundaries that don't need modification
 #------------------------------------------------------------------------------#
   
-# GAUL 
-spid_gaul <- filter(spid_bounds,geo_source=="GAUL" & geo_level!="x") |> 
+# GAUL 2015
+spid_gaul15 <- filter(spid_bounds,geo_source=="GAUL" & geo_year == 2015 & geo_level!="x") |> 
   select(c(1,7:14)) |> distinct(geo_code, .keep_all=TRUE) |>
   left_join(select(gaul2015, countryname, geo_id))
+
+# GAUL 2024
+spid_gaul24 <- filter(spid_bounds,geo_source=="GAUL" & geo_year == 2024 & geo_level!="x") |> 
+  select(c(1,7:14)) |> distinct(geo_code, .keep_all=TRUE) |>
+  left_join(select(gaul2024, countryname, geo_id))
 
 # NUTS 
 spid_nuts <- filter(spid_bounds,geo_source=="NUTS" & geo_level!="x") |> 
@@ -199,16 +219,20 @@ spid_nso <- filter(spid_bounds,geo_source %in% c("NSO", "DHS") & geo_level!="x")
   left_join(select(nso, code, countryname, geo_year, geo_level, geo_id))
 
 # ALL boundaries not to modify
-spid_nomod <- bind_rows(spid_gaul, spid_nuts, spid_gadm, spid_un, spid_nso) |> 
+spid_nomod <- bind_rows(spid_gaul15, spid_gaul24, spid_nuts, spid_gadm, spid_un, spid_nso) |> 
   st_as_sf()
 
 #------------------------------------------------------------------------------#
 # Modified boundaries
 #------------------------------------------------------------------------------#
 
-# GAUL 
-spid_gaulx <- filter(spid_x,geo_source=="GAUL") |> 
+# GAUL 2015
+spid_gaul15x <- filter(spid_x,geo_year == 2015, geo_source=="GAUL") |> 
   left_join(gaul2015[c("countryname","geo_id")])
+
+# GAUL 2024
+spid_gaul24x <- filter(spid_x,geo_year == 2024, geo_source=="GAUL") |> 
+  left_join(gaul2024[c("countryname","geo_id")])
 
 # NUTS 
 spid_nutsx <- filter(spid_x,geo_source=="NUTS") |> 
@@ -223,7 +247,7 @@ spid_unx <- filter(spid_x,geo_source=="UN") |>
   left_join(un[c("countryname","geo_id")])
 
 # ALL boundaries to modify
-spid_tomod <- bind_rows(spid_gaulx, spid_nutsx, spid_gadmx, spid_unx) |>
+spid_tomod <- bind_rows(spid_gaul15x, spid_gaul24x, spid_nutsx, spid_gadmx, spid_unx) |>
   st_as_sf()
 
 # create modified boundaries from union/difference geometry operations
@@ -298,7 +322,8 @@ for (i in 1:length(spid_list)){
       idvar <- "ADM1_CODE"
       nvar <- "ADM1_NAME"}
     
-    if (sample$geo_source[1]=="GAUL") {source <- gaul2015}
+    if (sample$geo_source[1]=="GAUL" & sample$geo_year[1]==2015) {source <- gaul2015}
+  if (sample$geo_source[1]=="GAUL" & sample$geo_year[1]==2024) {source <- gaul2024}
     if (sample$geo_source[1]=="NUTS") {source <- nuts}
     if (sample$geo_source[1]=="GADM") {source <- gadm41}
     if (sample$geo_source[1]=="UN") {source <- un}

@@ -56,11 +56,11 @@ twn <- gaul0[gaul0$ADM0_NAME=="Taiwan",] |>
   rename(geom = geometry) |>
   select(NAM_0, ISO_A3, WB_A3, GAUL_0)
 
-chn <- filter(wb0b,NAM_0=="China") |> #remove TWN from CHN 
+chn <- filter(wb0r2,NAM_0=="China") |> #remove TWN from CHN 
   st_difference(st_buffer(twn,units::set_units(5, km))) |>
   select(-contains("."))
 
-wb0c <- filter(wb0b,NAM_0!="China") |>
+wb0c <- filter(wb0r2,NAM_0!="China") |>
   bind_rows(chn, twn) 
 
 # add ID, tidy
@@ -69,7 +69,7 @@ wb0d <- arrange(wb0c, WB_A3, NAM_0) |>
 
   # extract population at this point if needed
 
-# merge WB codes and names, drop uninhabited territories
+# merge WB codes and names, drop some uninhabited territories
 codes <- read_xlsx(spid_master, sheet = "admin0 codes")
 
 wb0e <- select(wb0d, geo_id) |> left_join(codes) |>
@@ -81,14 +81,14 @@ dups <- group_by(wb0e,geo_code) |> filter(n()>1)
 
 dupsm <- group_by(dups,code, geo_name, geo_code) |> 
   summarise(geom = st_union(st_make_valid(geom))) |>
-  fill_holes(units::set_units(1, km^2)) 
+  fill_holes(units::set_units(1, km^2))
 
 # combine and check geo_codes are unique
 wb0_geo <- filter(wb0e, !geo_code %in% dups$geo_code) |> bind_rows(dupsm) |>
   arrange(geo_code)
 
-any(duplicated(wb0_geo$geo_code)) # FALSE = unique geo_codes
-any(!st_is_valid(wb0_geo$geom))  # FALSE = all valid
+stopifnot(!any(duplicated(wb0_geo$geo_code))) # TRUE = unique geo_codes
+stopifnot(all(st_is_valid(wb0_geo$geom)))  # TRUE = all valid
 
 # save geopackage
 st_write(wb0_geo,
@@ -103,14 +103,14 @@ st_write(wb0_geo,
 #------------------------------------------------------------------------------#
 # Extracting population for intermediate admin-0 boundaries
 #------------------------------------------------------------------------------#
-# 
+
 # library(terra)
 # library(exactextractr)
-# 
+
 # pop <- rast("~/Library/CloudStorage/OneDrive-WBG/Hazard exposure/inputs/population/GHS_POP_E2020_GLOBE_R2023A_4326_30ss_V1_0.tif")
 # totalpop <- exact_extract(pop, wb0d,fun = "sum", append_cols = c("geo_id"))
-# 
+
 # codes <- left_join(st_drop_geometry(wb0d),totalpop) |>
 #   rename(pop_ghs = sum)
-# 
+
 # write_xlsx(codes, paste0(spid_data,"interim/",version,"/admin0_attributes.xlsx"))

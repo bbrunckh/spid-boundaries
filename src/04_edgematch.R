@@ -131,17 +131,23 @@ st_write(spid_em,
          append=FALSE)
 
 #checks
+
+# number of subnat regions in SPID with and without data (internal)
 length(unique(spid_all$geo_code))
 
+# number of surveys in SPID (internal)
 surv_list <- mutate(spid_bounds, key = paste(code,year,survname))
 length(unique(surv_list$key))
 
+# number of subnat regions with data in SPID (internal)
 nrow(spid_em[spid_em$geo_code %in% spid_bounds$geo_code,]) 
 length(unique(spid_bounds$geo_code)) 
 
+# number of countries in SPID (internal)
 length(unique(spid_em$code))
 length(unique(spid_bounds$code)) 
 
 # AM24 vintage: 2156 subnat regions with data from 1113 surveys in 138 countries
 # SM25 vintage: 2261 subnat regions with data from 1243 surveys in 143 countries
 # AM25 vintage: 2270 subnat regions with data from 1288 surveys in 143 countries
+# SM26 vintage: 2360 subnat regions with data from 1318 surveys in 144 countries
