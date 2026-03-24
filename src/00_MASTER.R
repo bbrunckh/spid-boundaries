@@ -27,10 +27,16 @@ renv::restore()
 
 # # install packages (without using renv)
 # renv::deactivate()
-# install.packages(c("dplyr", "lwgeom", "sf", "smoothr", "openxlsx"))
+# install.packages(c("dplyr", "lwgeom", "sf", "smoothr", "openxlsx2"))
 
-# run scripts
+# run scripts to create boundary data
 source("src/01_admin0.R")
 source("src/02_subnat_prep.R")
 source("src/03_subnat.R")
 source("src/04_edgematch.R")
+
+# experimental edgematch using duckdb (not run)
+# source("src/04_edgematch_duckdb.R")
+
+# validate boundary data
+source("src/05_validate.R")

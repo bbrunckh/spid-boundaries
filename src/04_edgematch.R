@@ -175,8 +175,7 @@ process_survey <- function(key, spid_all, spid_subnat, admin0_list, skip_codes) 
     )
   }
 
-  em <- st_transform(em_poly, 4326)  |> # reproject to WGS84
-    filter(st_geometry_type(geom) %in% c("POLYGON", "MULTIPOLYGON"))
+  em <- st_transform(em_poly, 4326)  # reproject to WGS84
 
   if (nrow(em) == 0 || !"geo_code" %in% names(em)) return(NULL)
   return(em)
@@ -226,7 +225,7 @@ spid_em <- bind_rows(Filter(Negate(is.null), em_list))
 # Clean up
 #------------------------------------------------------------------------------#
 
-# FIX 4: guard against the case where all surveys failed
+# Guard against the case where all surveys failed
 if (nrow(spid_em) == 0 || !"geo_code" %in% names(spid_em)) {
   stop("Edge matching produced no results. Review the error messages above.")
 }
