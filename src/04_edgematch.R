@@ -36,11 +36,22 @@ dropped     <- read_xlsx(paste0(spid_data, "interim/", version, "/subnat_dropped
 # Joining once here means workers never need spid_subnat
 #------------------------------------------------------------------------------#
 
+#------------------------------------------------------------------------------#
+# Build spid_all WITHOUT geometry — keeps it small for parallel export.
+# Geometry is looked up per-worker from spid_geoms (geo_code → geom only).
+#------------------------------------------------------------------------------#
+
 spid_all <- bind_rows(spid_bounds, spid_miss) |>
   mutate(key = paste(code, year, survname, byvar)) |>
-  arrange(key) |>
-  left_join(select(spid_subnat, geo_code, geom), by = "geo_code") |>
-  st_as_sf()
+  arrange(key)
+
+# Compact geometry lookup: one row per unique geo_code
+spid_geoms <- spid_subnat |>
+  select(geo_code, geom) |>
+  st_make_valid() |>                          # repair before any geometry operation
+  filter(!duplicated(geo_code))               # deduplicate on key, not geometry
+
+stopifnot("Duplicate geo_codes in spid_subnat" = !anyDuplicated(spid_geoms$geo_code))
 
 spid_list <- rev(unique(spid_all$key))
 
@@ -55,7 +66,6 @@ admin0_list <- split(admin0, substr(admin0$geo_code, 1, 3)) |>
 # Each geo_code is assigned to its first occurrence in spid_list order
 # (reversed-chronological), so the most recent survey wins.
 geo_code_first_key <- spid_all |>
-  st_drop_geometry() |>
   arrange(match(key, spid_list)) |>
   distinct(geo_code, .keep_all = TRUE) |>
   select(geo_code, key)
@@ -113,14 +123,16 @@ message(
 # - vapply replaces sapply for type safety
 #------------------------------------------------------------------------------#
 
-process_survey <- function(key, spid_all, admin0_list, skip_codes) {
+process_survey <- function(key, spid_all, spid_geoms, admin0_list, skip_codes) {
 
-  # --- Build sample, immediately projected to 3395 ---
+  # --- Build sample: join geometry here, inside the worker ---
   sample_proj <- spid_all |>
     filter(key == !!key) |>
-    select(geo_code, geom) |>
-    filter(!is.na(st_dimension(geom))) |>
+    select(geo_code) |>
     filter(!geo_code %in% skip_codes) |>
+    left_join(spid_geoms, by = "geo_code") |>
+    st_as_sf() |>
+    filter(!is.na(st_dimension(geom))) |>
     st_make_valid() |>
     st_transform(3395) |>
     st_make_valid()
@@ -251,7 +263,7 @@ process_survey_parallel <- function(key) {
   skip_codes <- union(dropped_codes, setdiff(unique(spid_all$geo_code), allowed))
 
   tryCatch(
-    process_survey(key, spid_all, admin0_list, skip_codes),
+    process_survey(key, spid_all, spid_geoms, admin0_list, skip_codes),
     error = function(e) {
       message("Error processing key: ", key, "\n  ", conditionMessage(e))
       NULL
@@ -273,8 +285,9 @@ em_list <- future_map(
   .progress = TRUE,
   .options  = furrr_options(
     seed    = TRUE,
-    globals = c("spid_all", "admin0_list", "allowed_codes_by_key",
-                "dropped_codes", "process_survey")
+    globals = c("spid_all", "spid_geoms", "admin0_list", "allowed_codes_by_key",
+                "dropped_codes", "process_survey"),
+    packages = c("sf", "lwgeom", "dplyr", "units")
   )
 )
 
