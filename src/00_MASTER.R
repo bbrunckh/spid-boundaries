@@ -11,7 +11,7 @@ spid_data <- paste0("~/Library/CloudStorage/OneDrive-WBG/",
                     "spid-boundaries/data/")
 
 # set path to SPID master list (xlsx)
-spid_master <- paste0("/Users/bbrunckhorst/Library/CloudStorage/OneDrive-WBG/Minh\ Cong\ Nguyen\'s\ files\ -\ Poverty\ and\ Shared\ Prosperity\ SM2026/Subnational/02.input/SPID\ boundaries\ SM26.xlsx")
+spid_master <- paste0("~/Library/CloudStorage/OneDrive-WBG/Minh\ Cong\ Nguyen\'s\ files\ -\ Poverty\ and\ Shared\ Prosperity\ SM2026/Subnational/02.input/SPID\ boundaries\ SM26.xlsx")
 
 #------------------------------------------------------------------------------#
 
@@ -30,7 +30,7 @@ renv::restore()
 # install.packages(c("dplyr", "lwgeom", "sf", "smoothr", "openxlsx"))
 
 # run scripts
-source("01_admin0.R")
-source("02_subnat_prep.R")
-source("03_subnat.R")
-source("04_edgematch.R")
+source("src/01_admin0.R")
+source("src/02_subnat_prep.R")
+source("src/03_subnat.R")
+source("src/04_edgematch.R")
