@@ -8,6 +8,13 @@ library(dplyr)
 library(furrr)
 
 #------------------------------------------------------------------------------#
+# Path helpers (defined once, reused throughout)
+#------------------------------------------------------------------------------#
+
+path_final   <- paste0(spid_data, "final/",  version, "/", tolower(vintage))
+path_interim <- paste0(spid_data, "interim/", version, "/", tolower(vintage))
+
+#------------------------------------------------------------------------------#
 # SPID boundary IDs
 #------------------------------------------------------------------------------#
 
@@ -17,37 +24,38 @@ spid_bounds <- read_xlsx(spid_master, sheet = "SPID boundaries") |>
 spid_miss <- read_xlsx(spid_master, sheet = "SPID missing boundaries")
 
 #------------------------------------------------------------------------------#
-# admin-0 and subnational boundaries
+# Admin-0 and subnational boundaries
 #------------------------------------------------------------------------------#
 
-admin0 <- st_read(paste0(spid_data,"final/",version,"/",
-                         tolower(vintage),"_admin0.gpkg"))
-
-spid_subnat <- st_read(paste0(spid_data,"interim/",version,"/",
-                              tolower(vintage),"_subnat.gpkg"))
-
-dropped <- read_xlsx(paste0(spid_data,"interim/",version,
-                            "/subnat_dropped.xlsx"))
+admin0      <- st_read(paste0(path_final,   "_admin0.gpkg"))
+spid_subnat <- st_read(paste0(path_interim, "_subnat.gpkg"))
+dropped     <- read_xlsx(paste0(spid_data, "interim/", version, "/subnat_dropped.xlsx"))
 
 #------------------------------------------------------------------------------#
-# Edge match subnational boundaries to admin-0 - Voronoi method
+# Build spid_all with geometry pre-joined
+# Joining once here means workers never need spid_subnat
 #------------------------------------------------------------------------------#
 
 spid_all <- bind_rows(spid_bounds, spid_miss) |>
   mutate(key = paste(code, year, survname, byvar)) |>
-  arrange(key)
+  arrange(key) |>
+  left_join(select(spid_subnat, geo_code, geom), by = "geo_code") |>
+  st_as_sf()
 
 spid_list <- rev(unique(spid_all$key))
 
 sf_use_s2(FALSE)
 
-# Pre-index admin-0 by 3-letter country code
-admin0_list <- split(admin0, substr(admin0$geo_code, 1, 3))
+# Pre-index admin-0 by 3-letter country code, pre-unioned and pre-projected
+# so each worker receives a ready-to-use admin-0 geometry
+admin0_list <- split(admin0, substr(admin0$geo_code, 1, 3)) |>
+  lapply(function(x) st_union(x) |> st_make_valid() |> st_transform(3395) |> st_make_valid())
 
 # Pre-compute which geo_codes each survey key is responsible for.
 # Each geo_code is assigned to its first occurrence in spid_list order
 # (reversed-chronological), so the most recent survey wins.
 geo_code_first_key <- spid_all |>
+  st_drop_geometry() |>
   arrange(match(key, spid_list)) |>
   distinct(geo_code, .keep_all = TRUE) |>
   select(geo_code, key)
@@ -58,58 +66,108 @@ allowed_codes_by_key <- geo_code_first_key |>
   tibble::deframe()
 
 #------------------------------------------------------------------------------#
-# Per-survey processing function
+# Fingerprinting: deduplicate keys by their geo_code set
+# Keys with identical allowed geo_code sets produce identical edge-match
+# results, so only one representative key per unique set needs to be processed
 #------------------------------------------------------------------------------#
 
-process_survey <- function(key, spid_all, spid_subnat, admin0_list, skip_codes) {
+dropped_codes <- dropped$geo_code  # extract once; avoids passing full data frame to workers
 
-  # --- Build sample ---
-  sample <- filter(spid_all, key == !!key) |>
-    left_join(select(spid_subnat, geo_code, geom), by = "geo_code") |>
+# Build a fingerprint for each key: sorted, pipe-separated allowed geo_codes.
+# Keys with no allowed codes (all claimed by a more recent survey) are excluded
+# entirely — they would have returned NULL anyway, but this avoids dispatching
+# the job at all.
+key_signatures <- tibble::enframe(
+  lapply(allowed_codes_by_key, function(codes) {
+    # Also apply the dropped filter here so the fingerprint reflects what
+    # will actually be processed, not just what is nominally allowed
+    effective <- setdiff(codes, dropped_codes)
+    if (length(effective) == 0L) return(NA_character_)
+    paste(sort(effective), collapse = "|")
+  }),
+  name  = "key",
+  value = "sig"
+) |>
+  filter(!is.na(sig), key %in% spid_list)
+
+# Keep only the first (most recent) key per unique geo_code fingerprint.
+# spid_list is already in reversed-chronological order so the first match
+# is always the most recent survey for that configuration.
+unique_keys <- key_signatures |>
+  arrange(match(key, spid_list)) |>
+  distinct(sig, .keep_all = TRUE) |>
+  pull(key)
+
+message(
+  length(spid_list), " total keys -> ",
+  length(unique_keys), " unique geo_code sets to process (",
+  length(spid_list) - length(unique_keys), " skipped as duplicates or empty)"
+)
+
+#------------------------------------------------------------------------------#
+# Per-survey processing function
+# - Works entirely in EPSG:3395; reprojects to 4326 only at return
+# - st_make_valid() called only after topology-risk operations
+# - st_boundary() replaces st_cast to MULTILINESTRING
+# - Matrix-based point deduplication (faster than sf row-filtering)
+# - vapply replaces sapply for type safety
+#------------------------------------------------------------------------------#
+
+process_survey <- function(key, spid_all, admin0_list, skip_codes) {
+
+  # --- Build sample, immediately projected to 3395 ---
+  sample_proj <- spid_all |>
+    filter(key == !!key) |>
     select(geo_code, geom) |>
-    st_as_sf() |>
-    filter(!is.na(st_dimension(geom))) |>  # drop NA geometry rows
+    filter(!is.na(st_dimension(geom))) |>
+    filter(!geo_code %in% skip_codes) |>
+    st_make_valid() |>
+    st_transform(3395) |>
     st_make_valid()
 
-  sample <- filter(sample, !geo_code %in% skip_codes)
-  if (nrow(sample) == 0) return(NULL)
+  if (nrow(sample_proj) == 0) return(NULL)
 
-  # --- Target admin-0 ---
-  cty    <- substr(key, 1, 3)
-  target <- admin0_list[[cty]]
-  if (is.null(target)) return(NULL)
-  target <- st_union(target) |> st_make_valid()
+  # --- Target admin-0 (already unioned, validated, projected) ---
+  cty         <- substr(key, 1, 3)
+  target_proj <- admin0_list[[cty]]
+  if (is.null(target_proj)) return(NULL)
 
-  # --- Lines from polygon boundaries ---
-  samp_union <- st_union(sample) |> st_make_valid()
-  outline    <- st_cast(samp_union, "MULTILINESTRING")
+  # --- Union of sample for boundary extraction and gap-fill ---
+  samp_union_proj <- st_union(sample_proj) |> st_make_valid()
+
+  # --- Interior shared boundaries via st_boundary ---
+  outline <- st_boundary(samp_union_proj)
 
   lines <- suppressWarnings(
-    st_intersection(sample, outline) |>
+    st_intersection(sample_proj, outline) |>
       st_collection_extract("LINESTRING") |>
       st_make_valid()
   )
   if (nrow(lines) == 0) return(NULL)
 
-  # --- Points: segmentize and snap — stay in EPSG:3395 throughout ---
-  points_proj <- suppressWarnings(
+  # --- Points: segmentize, snap, deduplicate via coordinate matrix ---
+  pts_raw <- suppressWarnings(
     lines |>
-      st_transform(3395) |>
       st_segmentize(dfMaxLength = units::set_units(100, m)) |>
       st_cast("MULTIPOINT") |>
-      st_cast("POINT") |>
-      st_snap_to_grid(units::set_units(10, m)) |>
-      st_make_valid()
+      st_cast("POINT")
   )
 
-  pts_coords  <- st_coordinates(points_proj)
-  points_proj <- points_proj[!duplicated(pts_coords), ]
-  if (nrow(points_proj) < 4) return(NULL)
+  # Round to 10 m grid (equivalent to st_snap_to_grid) then deduplicate on matrix
+  pts_matrix <- round(st_coordinates(pts_raw), -1)
+  pts_matrix <- pts_matrix[!duplicated(pts_matrix), , drop = FALSE]
+  if (nrow(pts_matrix) < 4) return(NULL)
+
+  points_proj <- st_as_sf(
+    as.data.frame(pts_matrix[, c("X","Y")]),
+    coords = c("X","Y"),
+    crs    = 3395
+  )
 
   # --- Voronoi in EPSG:3395 ---
   voron <- tryCatch(
     st_collection_extract(st_voronoi(st_combine(points_proj))) |>
-      st_set_crs(st_crs(points_proj)) |>
+      st_set_crs(3395) |>
       st_make_valid(),
     error = function(e) {
       message("  Voronoi failed for: ", key, "\n  ", conditionMessage(e))
@@ -119,10 +177,10 @@ process_survey <- function(key, spid_all, spid_subnat, admin0_list, skip_codes) 
   if (is.null(voron)) return(NULL)
 
   voron_sf  <- st_sf(geom = voron)
-  voron_idx <- st_intersects(points_proj, voron_sf)
-  voron_idx <- sapply(
-    voron_idx,
-    function(x) if (length(x) == 0L) NA_integer_ else x[[1L]]
+  voron_idx <- vapply(
+    st_intersects(points_proj, voron_sf),
+    function(x) if (length(x) == 0L) NA_integer_ else x[[1L]],
+    integer(1L)
   )
 
   valid_pts   <- !is.na(voron_idx)
@@ -130,14 +188,15 @@ process_survey <- function(key, spid_all, spid_subnat, admin0_list, skip_codes) 
   points_proj <- points_proj[valid_pts, ]
   voron_idx   <- voron_idx[valid_pts]
 
-  # --- Project all layers ---
-  sample_proj     <- st_transform(sample, 3395)     |> st_make_valid()
-  samp_union_proj <- st_transform(samp_union, 3395) |> st_make_valid()
-  target_proj     <- st_transform(target, 3395)     |> st_make_valid()
+  # Re-attach geo_code via nearest-feature join back to sample polygons
+  points_proj$geo_code <- sample_proj$geo_code[
+    st_nearest_feature(points_proj, sample_proj)
+  ]
 
   # --- Assign Voronoi cells and build gap-filled polygons ---
   em_prediff <- tryCatch({
-    mutate(points_proj, geom = voron[voron_idx]) |>
+    points_proj |>
+      mutate(geom = voron[voron_idx]) |>
       st_make_valid() |>
       group_by(geo_code) |> summarize(geom = st_union(geom)) |>
       st_make_valid() |>
@@ -175,7 +234,7 @@ process_survey <- function(key, spid_all, spid_subnat, admin0_list, skip_codes) 
     )
   }
 
-  em <- st_transform(em_poly, 4326)  # reproject to WGS84
+  em <- st_transform(em_poly, 4326)  # reproject to WGS84 only at return
 
   if (nrow(em) == 0 || !"geo_code" %in% names(em)) return(NULL)
   return(em)
@@ -189,11 +248,10 @@ process_survey_parallel <- function(key) {
   allowed <- allowed_codes_by_key[[key]]
   if (is.null(allowed)) return(NULL)
 
-  skip_codes <- union(dropped$geo_code,
-                      setdiff(spid_all$geo_code, allowed))
+  skip_codes <- union(dropped_codes, setdiff(unique(spid_all$geo_code), allowed))
 
   tryCatch(
-    process_survey(key, spid_all, spid_subnat, admin0_list, skip_codes),
+    process_survey(key, spid_all, admin0_list, skip_codes),
     error = function(e) {
       message("Error processing key: ", key, "\n  ", conditionMessage(e))
       NULL
@@ -202,7 +260,7 @@ process_survey_parallel <- function(key) {
 }
 
 #------------------------------------------------------------------------------#
-# Run — parallel across surveys
+# Run — parallel across unique geo_code sets only
 #------------------------------------------------------------------------------#
 
 n_workers <- max(1L, parallel::detectCores() - 1L)
@@ -210,10 +268,14 @@ plan(multisession, workers = n_workers)
 message("Running with ", n_workers, " parallel workers.")
 
 em_list <- future_map(
-  spid_list,
+  unique_keys,                          # deduplicated by geo_code fingerprint
   process_survey_parallel,
   .progress = TRUE,
-  .options  = furrr_options(seed = TRUE)
+  .options  = furrr_options(
+    seed    = TRUE,
+    globals = c("spid_all", "admin0_list", "allowed_codes_by_key",
+                "dropped_codes", "process_survey")
+  )
 )
 
 plan(sequential)
@@ -238,7 +300,7 @@ spid_em <- distinct(spid_em, geo_code, .keep_all = TRUE) |>
 dropped2 <- filter(spid_subnat, !geo_code %in% spid_em$geo_code)
 dropped2
 
-# Add dropped regions back (some have samples)
+# Add dropped regions back (some have samples) and standardize column order
 spid_em <- bind_rows(spid_em, dropped2) |>
   select(code, geo_year, geo_source, geo_level, geo_idvar, geo_id,
          geo_nvar, geo_name, geo_code) |>
@@ -252,15 +314,9 @@ any(duplicated(spid_em$geo_code))   # FALSE = no duplicates
 # Check validity
 any(!st_is_valid(spid_em))          # FALSE = all valid
 
-# Save EM geopackage
-st_write(spid_em,
-         paste0(spid_data,"final/",version,"/",tolower(vintage),"_subnat_em.gpkg"),
-         append = FALSE)
-
-# Save EM shapefile
-st_write(spid_em,
-         paste0(spid_data,"final/",version,"/",tolower(vintage),"_subnat_em.shp"),
-         append = FALSE)
+# Save outputs
+st_write(spid_em, paste0(path_final, "_subnat_em.gpkg"), append = FALSE)
+st_write(spid_em, paste0(path_final, "_subnat_em.shp"),  append = FALSE)
 
 #------------------------------------------------------------------------------#
 # Checks
@@ -271,7 +327,7 @@ length(unique(spid_all$geo_code))
 surv_list <- mutate(spid_bounds, key = paste(code, year, survname))
 length(unique(surv_list$key))
 
-nrow(spid_em[spid_em$geo_code %in% spid_bounds$geo_code,])
+nrow(spid_em[spid_em$geo_code %in% spid_bounds$geo_code, ])
 length(unique(spid_bounds$geo_code))
 
 length(unique(spid_em$code))

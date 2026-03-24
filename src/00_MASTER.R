@@ -7,11 +7,12 @@
 vintage <- "SM26"
 
 # set directory to boundary data
-spid_data <- paste0("~/Library/CloudStorage/OneDrive-WBG/",
-                    "spid-boundaries/data/")
+# spid_data <- "~/Library/CloudStorage/OneDrive-WBG/spid-boundaries/data/"
+spid_data <- "C:/Users/wb587256/OneDrive - WBG/spid-boundaries/data/"
 
 # set path to SPID master list (xlsx)
-spid_master <- paste0("~/Library/CloudStorage/OneDrive-WBG/Minh\ Cong\ Nguyen\'s\ files\ -\ Poverty\ and\ Shared\ Prosperity\ SM2026/Subnational/02.input/SPID\ boundaries\ SM26.xlsx")
+# spid_master <- "~/Library/CloudStorage/OneDrive-WBG/Minh\ Cong\ Nguyen\'s\ files\ -\ Poverty\ and\ Shared\ Prosperity\ SM2026/Subnational/02.input/SPID\ boundaries\ SM26.xlsx"
+spid_master <- "C:/Users/wb587256/OneDrive - WBG/Minh\ Cong\ Nguyen\'s\ files\ -\ Poverty\ and\ Shared\ Prosperity\ SM2026/Subnational/02.input/SPID\ boundaries\ SM26.xlsx"
 
 #------------------------------------------------------------------------------#
 
@@ -34,9 +35,6 @@ source("src/01_admin0.R")
 source("src/02_subnat_prep.R")
 source("src/03_subnat.R")
 source("src/04_edgematch.R")
-
-# experimental edgematch using duckdb (not run)
-# source("src/04_edgematch_duckdb.R")
 
 # validate boundary data
 source("src/05_validate.R")
