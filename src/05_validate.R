@@ -5,6 +5,7 @@ library(sf)
 library(leaflet)
 library(dplyr)
 library(units)
+library(openxlsx2)
 
 
 #------------------------------------------------------------------------------#
@@ -17,6 +18,14 @@ spid_em <- st_read(paste0(spid_data,"final/",version,"/",
 admin0 <- st_read(paste0(spid_data,"final/",version,"/",
                          tolower(vintage),"_admin0.gpkg"))
 
+spid_bounds <- read_xlsx(spid_master, sheet = "SPID boundaries") |>
+  filter(!is.na(geo_code))
+
+spid_miss <- read_xlsx(spid_master, sheet = "SPID missing boundaries")
+
+spid_all <- bind_rows(spid_bounds, spid_miss) |>
+  mutate(key = paste(code, year, survname, byvar)) |>
+  arrange(key)
 
 sf_use_s2(FALSE)
 
@@ -106,6 +115,9 @@ country_codes <- unique(spid_em$code)
 gap_report    <- data.frame()
 
 for (cty in country_codes) {
+
+  # suppress warnings from st_difference (e.g. due to topology issues) but continue processing
+
   
   subnat_cty <- filter(spid_em, code == cty)
   admin_cty  <- filter(admin0,
@@ -141,9 +153,15 @@ cat("\n")
 #------------------------------------------------------------------------------#
 # 6. Overlap check — do any subnational polygons overlap each other within
 #    the same country? Overlaps indicate a topology problem.
+#    Only flag pairs that share at least one survey key (code/year/survname/byvar).
 #------------------------------------------------------------------------------#
 
 cat("--- 6. Intra-country overlaps ---\n")
+
+# Lookup: geo_code -> unique survey keys it appears in
+geo_keys <- spid_all |>
+  select(geo_code, key) |>
+  filter(!is.na(geo_code))
 
 overlap_report <- data.frame()
 
@@ -153,7 +171,9 @@ for (cty in country_codes) {
   if (nrow(subnat_cty) < 2) next
   
   # Self-intersection matrix; suppress diagonal and upper triangle
-  inter_mat <- st_intersects(subnat_cty, subnat_cty, sparse = FALSE)
+  suppressWarnings(
+    inter_mat <- st_intersects(subnat_cty, subnat_cty, sparse = FALSE)
+  )
   diag(inter_mat) <- FALSE
   inter_mat[upper.tri(inter_mat)] <- FALSE
   
@@ -164,8 +184,17 @@ for (cty in country_codes) {
   # Only flag pairs with genuine area overlap (not just shared boundaries)
   for (p in 1:nrow(pairs)) {
     a <- pairs[p, 1]; b <- pairs[p, 2]
+    
+    gc_a <- subnat_cty$geo_code[a]
+    gc_b <- subnat_cty$geo_code[b]
+    
+    # Skip if the two regions share no survey key
+    keys_a <- geo_keys$key[geo_keys$geo_code == gc_a]
+    keys_b <- geo_keys$key[geo_keys$geo_code == gc_b]
+    if (length(intersect(keys_a, keys_b)) == 0) next
+    
     overlap_geom <- tryCatch(
-      st_intersection(subnat_cty$geom[a], subnat_cty$geom[b]),
+      suppressWarnings(st_intersection(subnat_cty$geom[a], subnat_cty$geom[b])),
       error = function(e) NULL
     )
     if (is.null(overlap_geom) || st_is_empty(overlap_geom)) next
@@ -176,9 +205,9 @@ for (cty in country_codes) {
     overlap_area <- as.numeric(set_units(st_area(overlap_geom), km^2))
     if (overlap_area > 0.01) {  # ignore sub-10m² numerical noise
       overlap_report <- bind_rows(overlap_report, data.frame(
-        code       = cty,
-        geo_code_a = subnat_cty$geo_code[a],
-        geo_code_b = subnat_cty$geo_code[b],
+        code        = cty,
+        geo_code_a  = gc_a,
+        geo_code_b  = gc_b,
         overlap_km2 = round(overlap_area, 4)
       ))
     }
@@ -292,11 +321,21 @@ cat("====================================================\n")
 
 spid_em_wgs <- spid_em |>
   st_transform(4326) |>
-  rename(geometry = geom)        # leaflet expects "geometry"
+  rename(geometry = geom) 
 
 admin0_wgs <- admin0 |>
   st_transform(4326) |>
-  rename(geometry = geom)
+  rename(geometry = geom) 
+
+spid_em_wgs <- spid_em |>
+  filter(code == "KGZ", geo_source == "GAUL") |>
+  st_transform(4326) |>
+  rename(geometry = geom) 
+
+admin0_wgs <- admin0 |>
+  filter(code == "KGZ") |>
+  st_transform(4326) |>
+  rename(geometry = geom) 
 
 # Colour palette — one colour per geo_level (or per country if preferred)
 
