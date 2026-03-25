@@ -7,6 +7,18 @@ library(dplyr)
 library(units)
 library(openxlsx2)
 
+#------------------------------------------------------------------------------#
+# version to validate
+#------------------------------------------------------------------------------#
+
+vintage <- "SM26"
+version <- paste0(vintage,"_2026-03-05")
+
+spid_data <- "~/Library/CloudStorage/OneDrive-WBG/spid-boundaries/data/"
+# spid_data <- "C:/Users/wb587256/OneDrive - WBG/spid-boundaries/data/"
+spid_master <- "~/Library/CloudStorage/OneDrive-WBG/Minh\ Cong\ Nguyen\'s\ files\ -\ Poverty\ and\ Shared\ Prosperity\ SM2026/Subnational/02.input/SPID\ boundaries\ SM26.xlsx"
+# spid_master <- "C:/Users/wb587256/OneDrive - WBG/Minh\ Cong\ Nguyen\'s\ files\ -\ Poverty\ and\ Shared\ Prosperity\ SM2026/Subnational/02.input/SPID\ boundaries\ SM26.xlsx"
+
 
 #------------------------------------------------------------------------------#
 # 0. Load data 
@@ -125,10 +137,12 @@ for (cty in country_codes) {
   
   if (nrow(admin_cty) == 0) next
   
-  gap <- tryCatch(
+  gap <- suppressWarnings(suppressMessages(
+    tryCatch(
     st_difference(admin_cty, st_union(subnat_cty)),
     error = function(e) NULL
-  )
+    )
+  ))
   
   if (is.null(gap) || nrow(gap) == 0 || st_is_empty(gap)) next
   
@@ -171,9 +185,9 @@ for (cty in country_codes) {
   if (nrow(subnat_cty) < 2) next
   
   # Self-intersection matrix; suppress diagonal and upper triangle
-  suppressWarnings(
+  suppressWarnings(suppressMessages(
     inter_mat <- st_intersects(subnat_cty, subnat_cty, sparse = FALSE)
-  )
+  ))
   diag(inter_mat) <- FALSE
   inter_mat[upper.tri(inter_mat)] <- FALSE
   
@@ -193,10 +207,12 @@ for (cty in country_codes) {
     keys_b <- geo_keys$key[geo_keys$geo_code == gc_b]
     if (length(intersect(keys_a, keys_b)) == 0) next
     
-    overlap_geom <- tryCatch(
-      suppressWarnings(st_intersection(subnat_cty$geom[a], subnat_cty$geom[b])),
+    overlap_geom <- suppressWarnings(suppressMessages(
+      tryCatch(
+      st_intersection(subnat_cty$geom[a], subnat_cty$geom[b]),
       error = function(e) NULL
-    )
+      )
+    ))
     if (is.null(overlap_geom) || st_is_empty(overlap_geom)) next
     
     overlap_type <- st_geometry_type(overlap_geom)
@@ -324,16 +340,6 @@ spid_em_wgs <- spid_em |>
   rename(geometry = geom) 
 
 admin0_wgs <- admin0 |>
-  st_transform(4326) |>
-  rename(geometry = geom) 
-
-spid_em_wgs <- spid_em |>
-  filter(code == "KGZ", geo_source == "GAUL") |>
-  st_transform(4326) |>
-  rename(geometry = geom) 
-
-admin0_wgs <- admin0 |>
-  filter(code == "KGZ") |>
   st_transform(4326) |>
   rename(geometry = geom) 
 
