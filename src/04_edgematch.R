@@ -253,10 +253,25 @@ process_survey <- function(key, spid_all, spid_geoms, admin0_list, skip_codes) {
 }
 
 #------------------------------------------------------------------------------#
+# Run — parallel across unique geo_code sets only
+#------------------------------------------------------------------------------#
+
+# Write large globals to disk so workers read from file rather than having
+# them serialized and sent over the socket connection (~3 GiB → ~0 GiB export)
+tmp_spid_all   <- tempfile(fileext = ".rds")
+tmp_spid_geoms <- tempfile(fileext = ".rds")
+saveRDS(spid_all,   tmp_spid_all)
+saveRDS(spid_geoms, tmp_spid_geoms)
+
+#------------------------------------------------------------------------------#
 # Parallel wrapper
 #------------------------------------------------------------------------------#
 
 process_survey_parallel <- function(key) {
+  # Read inside worker — only loaded once per worker process via OS file cache
+  spid_all   <- readRDS(tmp_spid_all)
+  spid_geoms <- readRDS(tmp_spid_geoms)
+
   allowed <- allowed_codes_by_key[[key]]
   if (is.null(allowed)) return(NULL)
 
@@ -271,27 +286,26 @@ process_survey_parallel <- function(key) {
   )
 }
 
-#------------------------------------------------------------------------------#
-# Run — parallel across unique geo_code sets only
-#------------------------------------------------------------------------------#
-
-n_workers <- max(1L, parallel::detectCores() - 1L)
+n_workers <- max(1L, parallel::detectCores() - 2L)
 plan(multisession, workers = n_workers)
 message("Running with ", n_workers, " parallel workers.")
 
 em_list <- future_map(
-  unique_keys,                          # deduplicated by geo_code fingerprint
+  unique_keys,
   process_survey_parallel,
   .progress = TRUE,
   .options  = furrr_options(
-    seed    = TRUE,
-    globals = c("spid_all", "spid_geoms", "admin0_list", "allowed_codes_by_key",
-                "dropped_codes", "process_survey"),
+    seed     = TRUE,
+    globals  = c("tmp_spid_all", "tmp_spid_geoms", "admin0_list",
+                 "allowed_codes_by_key", "dropped_codes", "process_survey"),
     packages = c("sf", "lwgeom", "dplyr", "units")
   )
 )
 
 plan(sequential)
+
+# Clean up temp files
+unlink(c(tmp_spid_all, tmp_spid_geoms))
 
 # Combine, dropping NULLs
 spid_em <- bind_rows(Filter(Negate(is.null), em_list))

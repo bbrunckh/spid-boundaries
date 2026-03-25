@@ -24,7 +24,7 @@ dir.create(paste0(spid_data,"interim/",version))
 dir.create(paste0(spid_data,"final/",version))
 
 # install packages using renv
-renv::restore()
+# renv::restore()
 
 # # install packages (without using renv)
 # renv::deactivate()
