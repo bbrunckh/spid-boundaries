@@ -12,7 +12,7 @@ spid_data <- "C:/Users/wb587256/OneDrive - WBG/spid-boundaries/data/"
 
 # set path to SPID master list (xlsx)
 # spid_master <- "~/Library/CloudStorage/OneDrive-WBG/Minh\ Cong\ Nguyen\'s\ files\ -\ Poverty\ and\ Shared\ Prosperity\ SM2026/Subnational/02.input/SPID\ boundaries\ SM26.xlsx"
-spid_master <- "C:/Users/wb587256/OneDrive - WBG/Minh\ Cong\ Nguyen\'s\ files\ -\ Poverty\ and\ Shared\ Prosperity\ SM2026/Subnational/02.input/SPID\ boundaries\ SM26.xlsx"
+spid_master <- "C:/Users/wb587256/OneDrive - WBG/Minh\ Cong\ Nguyen\'s\ files\ -\ Poverty\ and\ Shared\ Prosperity\ AM2026/Subnational/02.input/SPID\ boundaries\ SM26.xlsx"
 
 #------------------------------------------------------------------------------#
 

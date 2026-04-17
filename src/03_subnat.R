@@ -60,8 +60,26 @@ stopifnot(nrow(spid_bounds[spid_bounds$geo_level=="x" &
 
 gaul0 <- st_read(paste0(spid_data,"raw/GAUL2015/gaul0")) |>
   mutate(geo_level = "0")
+
 gaul1 <- st_read(paste0(spid_data,"raw/GAUL2015/gaul1")) |>
   mutate(geo_level = "1")
+
+# Manual corrections to GAUL 2015 level 1
+
+  # Bishkek (ADM1_CODE 147293) overlaps other KGZ subnational regions:
+  kgz_other <- gaul1 |> filter(ADM0_CODE == gaul1$ADM0_CODE[gaul1$ADM1_CODE == 147293][1],
+                                ADM1_CODE != 147293)
+  kgz_other_union <- st_union(kgz_other)
+  bishkek_idx <- which(gaul1$ADM1_CODE == 147293)
+  gaul1$geometry[bishkek_idx] <- st_difference(gaul1$geometry[bishkek_idx], kgz_other_union)
+
+  # GIN region 40704 overlaps 40706: replace 40704 with the difference minus 40706
+  gin_other <- gaul1 |> filter(ADM0_CODE == gaul1$ADM0_CODE[gaul1$ADM1_CODE == 40704][1],
+                                ADM1_CODE != 40704)
+  gin_other_union <- st_union(gin_other)
+  gin_40704_idx <- which(gaul1$ADM1_CODE == 40704)
+  gaul1$geometry[gin_40704_idx] <- st_difference(gaul1$geometry[gin_40704_idx], gin_other_union)
+
 gaul2 <- st_read(paste0(spid_data,"raw//GAUL2015/gaul2"), 
                  crs = st_crs(gaul1)) |>
   mutate(geo_level = "2")
@@ -76,6 +94,9 @@ gaul2015 <- bind_rows(gaul0,gaul1,gaul2) |>
   left_join(admin0_codes[c("code","ADM0_CODE")])
 
 any(is.na(gaul2015$geo_id))
+
+
+
 
 
 # Subnational boundaries from GAUL 2024

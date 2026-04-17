@@ -5,7 +5,7 @@
 # writes outputs. Expects these variables to exist in the environment already:
 #   spid_master  <chr> path to the master .xlsx
 #   spid_data    <chr> root data directory
-#   version      <chr> e.g. "v1"
+#   version      <chr> e.g. "2020-01-01"
 #   vintage      <chr> e.g. "AM25"
 
 rm(list = setdiff(ls(), c("spid_master", "spid_data", "version", "vintage")))
